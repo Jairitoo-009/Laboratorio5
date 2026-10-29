@@ -1,74 +1,488 @@
 <!doctype html>
-<html>
+<html lang="es">
   <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f1f5f9">
     <title>Chat Socket.IO UNA</title>
     <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font: 13px Helvetica, Arial; }
-      form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
-      form input { border: 0; padding: 10px;}
-      form button { width: 10%; background: rgb(130, 224, 255);  border: none; padding: 10px; }
-      #messages { list-style-type: none; margin: 0; padding: 0; }
-      #messages li { padding: 5px 10px; }
-      #messages li:nth-child(odd) { background: #eee; }
-      #messages { margin-bottom: 40px }
-      #nombre, #m { display: inline-block;}
-      #m {width: 69%; margin-right: 4px;}
-      #nombre {width: 20%}
+      :root {
+        color-scheme: light;
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+        color: #172033;
+        background: #f1f5f9;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        min-height: 100dvh;
+        margin: 0;
+        padding: 24px;
+        background:
+          radial-gradient(ellipse at 12% 0%, #dbeafe 0, transparent 36%),
+          #f1f5f9;
+      }
+
+      .chat-shell {
+        display: flex;
+        flex-direction: column;
+        width: min(100%, 960px);
+        height: min(900px, calc(100vh - 48px));
+        height: min(900px, calc(100dvh - 48px));
+        min-height: 360px;
+        margin: 0 auto;
+        overflow: hidden;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        box-shadow: 0 24px 70px rgb(15 23 42 / 12%);
+      }
+
+      .chat-header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 20px 24px;
+        color: #fff;
+        background: linear-gradient(120deg, #1e3a8a, #2563eb);
+      }
+
+      .chat-mark {
+        display: grid;
+        width: 44px;
+        height: 44px;
+        flex: 0 0 auto;
+        place-items: center;
+        background: rgb(255 255 255 / 16%);
+        border: 1px solid rgb(255 255 255 / 22%);
+        border-radius: 14px;
+        font-size: 22px;
+      }
+
+      .chat-heading { min-width: 0; }
+      .chat-heading h1 { margin: 0; font-size: 18px; line-height: 1.3; }
+      .chat-heading p { margin: 4px 0 0; color: #dbeafe; font-size: 13px; }
+      .connection-state { margin-left: auto; color: #dcfce7; font-size: 12px; white-space: nowrap; }
+      .connection-state::before {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin-right: 7px;
+        background: #4ade80;
+        border-radius: 50%;
+        content: "";
+      }
+      .connection-state.desconectado { color: #fee2e2; }
+      .connection-state.desconectado::before { background: #f87171; }
+
+      #messages {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+        margin: 0;
+        padding: 24px;
+        overflow-y: auto;
+        list-style: none;
+        overscroll-behavior: contain;
+      }
+
+      #messages:empty::before {
+        align-self: center;
+        margin: auto;
+        color: #94a3b8;
+        content: "Los mensajes y archivos compartidos aparecerán aquí";
+        font-size: 14px;
+        text-align: center;
+      }
+
+      #messages li {
+        width: fit-content;
+        max-width: min(80%, 680px);
+        padding: 11px 14px;
+        overflow-wrap: anywhere;
+        color: #334155;
+        background: #f1f5f9;
+        border: 1px solid #e8edf4;
+        border-radius: 4px 16px 16px;
+        line-height: 1.5;
+      }
+
+      #messages li .message-author {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      #messages li.con-media {
+        max-width: min(80%, 680px);
+        padding: 12px;
+      }
+
+      .media-wrap { display: block; margin-top: 8px; }
+
+      #messages li img,
+      #messages li video {
+        display: block;
+        width: auto;
+        max-width: 100%;
+        max-height: 420px;
+        border-radius: 10px;
+        background: #e2e8f0;
+        object-fit: contain;
+      }
+
+      #messages li iframe {
+        display: block;
+        width: min(560px, 100%);
+        aspect-ratio: 16 / 9;
+        border: 0;
+        border-radius: 10px;
+        background: #e2e8f0;
+      }
+
+      .media-error {
+        display: block;
+        margin-top: 8px;
+        color: #b45309;
+        font-size: 12px;
+      }
+
+      .media-loading {
+        color: #64748b;
+        font-size: 13px;
+      }
+
+      .chat-composer {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 16px 20px;
+        background: #fff;
+        border-top: 1px solid #e8edf4;
+      }
+
+      .chat-composer input {
+        min-width: 0;
+        height: 46px;
+        padding: 0 14px;
+        color: #172033;
+        background: #f8fafc;
+        border: 1px solid #dbe3ee;
+        border-radius: 12px;
+        font: inherit;
+        outline: none;
+        transition: border-color 150ms ease, box-shadow 150ms ease;
+      }
+
+      .chat-composer input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgb(59 130 246 / 14%);
+      }
+
+      #nombre { width: 24%; }
+      #m { flex: 1; }
+
+      .chat-composer button {
+        height: 46px;
+        padding: 0 22px;
+        color: #fff;
+        background: #2563eb;
+        border: 0;
+        border-radius: 12px;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 650;
+        transition: background 150ms ease, transform 150ms ease;
+      }
+
+      .chat-composer button:hover { background: #1d4ed8; }
+      .chat-composer button:active { transform: translateY(1px); }
+      .chat-composer button:disabled {
+        background: #94a3b8;
+        cursor: not-allowed;
+      }
+
+      @media (max-width: 640px) {
+        body { padding: 0; background: #fff; }
+        .chat-shell {
+          width: 100%;
+          height: 100vh;
+          height: 100dvh;
+          min-height: 320px;
+          border: 0;
+          border-radius: 0;
+          box-shadow: none;
+        }
+        .chat-header { padding: 16px; }
+        .chat-heading h1 { font-size: 16px; }
+        .connection-state { font-size: 0; }
+        .connection-state::before { width: 10px; height: 10px; margin: 0; }
+        #messages { gap: 10px; padding: 16px; }
+        #messages li,
+        #messages li.con-media { max-width: 94%; }
+        #messages li img,
+        #messages li video { max-height: 300px; }
+        .chat-composer { gap: 7px; padding: 12px; }
+        .chat-composer input { height: 44px; padding: 0 10px; font-size: 14px; }
+        #nombre { width: 27%; }
+        .chat-composer button { height: 44px; padding: 0 14px; }
+      }
     </style>
   </head>
   <body>
-    <ul id="messages"></ul>
-    <form action="">
-      <input id="nombre" autocomplete="off" placeholder="Username"/>
-      <input id="m" autocomplete="off" placeholder="Escriba un mensaje" /><button>Send</button>
-    </form>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.js"></script>
-    <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
+    <main class="chat-shell">
+      <header class="chat-header">
+        <div class="chat-mark" aria-hidden="true">💬</div>
+        <div class="chat-heading">
+          <h1>Chat UNA</h1>
+          <p>Comparte mensajes, imágenes y videos</p>
+        </div>
+        <span id="connection-state" class="connection-state" role="status">Conectando</span>
+      </header>
+
+      <ul id="messages" aria-live="polite" aria-label="Mensajes del chat"></ul>
+
+      <form class="chat-composer">
+        <input id="nombre" autocomplete="nickname" placeholder="Tu nombre" aria-label="Tu nombre">
+        <input id="m" autocomplete="off" placeholder="Escriba un mensaje o pega una URL de imagen/video" aria-label="Mensaje" required>
+        <button id="send-button" type="submit" disabled>Enviar</button>
+      </form>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
     <script>
+      (function () {
+        var socket = io();
+        var form = document.querySelector('.chat-composer');
+        var nameInput = document.getElementById('nombre');
+        var messageInput = document.getElementById('m');
+        var sendButton = document.getElementById('send-button');
+        var messages = document.getElementById('messages');
+        var connectionState = document.getElementById('connection-state');
 
-    var colorHexTxt = "";
-
-    // genera colores aleatorios en hexadeximal
-    function getRandomColor() {
-        var letters = '0123456789ABCDEF';
-        var color = '#';
-        for (var i = 0; i < 6; i++) {
-          color += letters[Math.floor(Math.random() * 16)];
+        function setConnectionState(connected) {
+          connectionState.textContent = connected ? 'Conectado' : 'Desconectado';
+          connectionState.classList.toggle('desconectado', !connected);
+          sendButton.disabled = !connected;
         }
 
-        return color;
-     }
-
-      $(function () {
-        var socket = io();
-
-        // emite evento al servidor
-        
-        $('form').submit(function(){
-            var nombreTxt = $('#nombre').val() || "Anomimo";
-            var mensajeTxt = $('#m').val();
-
-            if (colorHexTxt == "") {
-                colorHexTxt = getRandomColor();
-            }
-
-            var jsonMsg = { nombre: nombreTxt, mensaje: mensajeTxt, color: colorHexTxt };
-            socket.emit('Evento-Mensaje-Server', JSON.stringify(jsonMsg));
-            $('#m').val('');
+        function isHttpUrl(value) {
+          try {
+            var url = new URL(value);
+            return (url.protocol === 'https:' || url.protocol === 'http:') &&
+              !url.username && !url.password &&
+              /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9-]{2,}$/i.test(url.hostname);
+          } catch (error) {
             return false;
+          }
+        }
+
+        function probeUrlMedia(value, done) {
+          if (!isHttpUrl(value)) {
+            return false;
+          }
+
+          var url = new URL(value);
+          var image = document.createElement('img');
+          var finished = false;
+          var timer;
+
+          function finish(media) {
+            if (finished) {
+              return;
+            }
+            finished = true;
+            window.clearTimeout(timer);
+            done(media);
+          }
+
+          function tryVideo() {
+            if (finished) {
+              return;
+            }
+            window.clearTimeout(timer);
+
+            var video = document.createElement('video');
+            video.controls = true;
+            video.preload = 'metadata';
+            video.referrerPolicy = 'no-referrer';
+            video.addEventListener('loadedmetadata', function () { finish(video); }, { once: true });
+            video.addEventListener('error', function () { finish(null); }, { once: true });
+            timer = window.setTimeout(function () {
+              video.removeAttribute('src');
+              video.load();
+              finish(null);
+            }, 8000);
+            video.src = url.href;
+          }
+
+          image.referrerPolicy = 'no-referrer';
+          image.addEventListener('load', function () {
+            if (image.naturalWidth > 0) {
+              finish(image);
+            } else {
+              tryVideo();
+            }
+          }, { once: true });
+          image.addEventListener('error', tryVideo, { once: true });
+          timer = window.setTimeout(function () {
+            image.removeAttribute('src');
+            tryVideo();
+          }, 5000);
+          image.src = url.href;
+          return true;
+        }
+
+        function createMediaElement(markup) {
+          var parsed = new DOMParser().parseFromString(markup, 'text/html');
+          var source = parsed.body.firstElementChild;
+          if (!source || parsed.body.children.length !== 1 || parsed.body.textContent.trim()) {
+            return null;
+          }
+
+          var element;
+          var url;
+          if (source.tagName === 'IMG' && isHttpUrl(source.getAttribute('src') || '')) {
+            url = new URL(source.getAttribute('src'));
+            element = document.createElement('img');
+            element.src = url.href;
+            element.alt = 'Imagen compartida';
+          } else if (source.tagName === 'VIDEO' && isHttpUrl(source.getAttribute('src') || '')) {
+            url = new URL(source.getAttribute('src'));
+            element = document.createElement('video');
+            element.src = url.href;
+            element.controls = true;
+            element.preload = 'metadata';
+          } else if (source.tagName === 'IFRAME' && isHttpUrl(source.getAttribute('src') || '')) {
+            url = new URL(source.getAttribute('src'));
+            if (url.protocol !== 'https:' || url.hostname !== 'www.youtube.com' || !/^\/embed\/[\w-]{11}$/.test(url.pathname)) {
+              return null;
+            }
+            element = document.createElement('iframe');
+            element.src = url.href;
+            element.title = 'Video de YouTube';
+            element.loading = 'lazy';
+            element.allowFullscreen = true;
+          } else {
+            return null;
+          }
+
+          return element;
+        }
+
+        function appendMedia(wrap, media) {
+          media.addEventListener('error', function () {
+            var error = document.createElement('span');
+            error.className = 'media-error';
+            error.textContent = 'No se pudo cargar este archivo multimedia. Comprueba que la URL siga disponible.';
+            wrap.appendChild(error);
+          }, { once: true });
+          wrap.appendChild(media);
+        }
+
+        function decodeHtmlEntities(value) {
+          var textarea = document.createElement('textarea');
+          textarea.innerHTML = value;
+          return textarea.value;
+        }
+
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          var text = messageInput.value.trim();
+          if (!text || !socket.connected) {
+            return;
+          }
+
+          socket.emit('Evento-Mensaje-Server', JSON.stringify({
+            nombre: nameInput.value.trim() || 'Anónimo',
+            mensaje: text,
+            color: '#2563eb'
+          }));
+          messageInput.value = '';
+          messageInput.focus();
         });
 
-        // ... (resto del código) ...
+        socket.on('connect', function () { setConnectionState(true); });
+        socket.on('disconnect', function () { setConnectionState(false); });
 
-        socket.on('Evento-Mensaje-Server', function(msg){
-            var msgJson = JSON.parse(msg);
-            var mensajeDisplay = "<b style='color:"+ msgJson.color +"'>" + msgJson.nombre + "</b>: " + msgJson.mensaje;
-            $('#messages').append($('<li>').html(mensajeDisplay));
-            window.scrollTo(0, document.body.scrollHeight);
+        function renderMessage(message) {
+          var item = document.createElement('li');
+          var author = document.createElement('span');
+          author.className = 'message-author';
+          author.textContent = String(message.nombre || 'Anónimo');
+          if (/^#[0-9a-fA-F]{3,8}$/.test(message.color || '')) {
+            author.style.color = message.color;
+          }
+          item.appendChild(author);
+
+          var content = String(message.mensaje || '');
+          var media = createMediaElement(content);
+          if (media) {
+            var wrap = document.createElement('span');
+            wrap.className = 'media-wrap';
+            item.classList.add('con-media');
+            appendMedia(wrap, media);
+            item.appendChild(wrap);
+          } else {
+            var text = document.createElement('span');
+            var loading = document.createElement('span');
+            var plainContent = decodeHtmlEntities(content);
+            loading.className = 'media-loading';
+            loading.textContent = 'Verificando enlace multimedia…';
+            if (probeUrlMedia(plainContent, function (detectedMedia) {
+              if (!loading.isConnected) {
+                return;
+              }
+              if (!detectedMedia) {
+                loading.textContent = plainContent;
+                loading.classList.remove('media-loading');
+                return;
+              }
+
+              var wrap = document.createElement('span');
+              wrap.className = 'media-wrap';
+              item.classList.add('con-media');
+              appendMedia(wrap, detectedMedia);
+              loading.replaceWith(wrap);
+            })) {
+              text.appendChild(loading);
+            } else {
+              text.textContent = plainContent;
+            }
+            item.appendChild(text);
+          }
+
+          messages.appendChild(item);
+          messages.scrollTop = messages.scrollHeight;
+        }
+
+        [
+          {
+            nombre: 'Ejemplo · Imagen',
+            color: '#2563eb',
+            mensaje: '<img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg" alt="imagen">'
+          },
+          {
+            nombre: 'Ejemplo · Video',
+            color: '#7c3aed',
+            mensaje: '<video controls src="https://mdn.github.io/shared-assets/videos/flower.mp4"></video>'
+          }
+        ].forEach(renderMessage);
+
+        socket.on('Evento-Mensaje-Server', function (rawMessage) {
+          try {
+            renderMessage(JSON.parse(rawMessage));
+          } catch (error) {
+            console.error('No se pudo leer el mensaje recibido del chat.', error);
+          }
         });
-
-      });
+      }());
     </script>
   </body>
 </html>
